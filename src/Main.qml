@@ -259,12 +259,28 @@ ApplicationWindow {
                         : skipHiddenBackward(pos);
                 }
 
+                function deleteParagraphBreakBehindCursor() {
+                    if (selectionStart !== selectionEnd || cursorPosition < 2)
+                        return false;
+
+                    if (text.slice(cursorPosition - 2, cursorPosition) !== "\n\n")
+                        return false;
+
+                    var start = cursorPosition - 2;
+                    remove(start, cursorPosition);
+                    cursorPosition = start;
+                    return true;
+                }
+
                 Keys.priority: Keys.BeforeItem
                 Keys.onPressed: function(event) {
                     var returnKey = event.key === Qt.Key_Return || event.key === Qt.Key_Enter;
                     var commandModifier = event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier);
                     if (returnKey && !commandModifier) {
                         replaceSelectionWith((event.modifiers & Qt.ShiftModifier) ? "\n" : "\n\n");
+                        event.accepted = true;
+                    } else if (!commandModifier && event.key === Qt.Key_Backspace
+                               && deleteParagraphBreakBehindCursor()) {
                         event.accepted = true;
                     } else if (!commandModifier && !(event.modifiers & Qt.ShiftModifier)
                                && event.key === Qt.Key_Right) {
