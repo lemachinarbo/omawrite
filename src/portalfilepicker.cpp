@@ -31,7 +31,7 @@ void PortalFilePicker::openDocument() {
     options.insert(QStringLiteral("multiple"), false);
     options.insert(QStringLiteral("current_folder"), portalPathBytes(QDir::homePath()));
 
-    requestFile(QStringLiteral("OpenFile"), QStringLiteral("Open Markdown file"),
+    requestFile(QStringLiteral("OpenFile"), QStringLiteral("Open File"),
                 options, Action::Open);
 }
 
@@ -54,7 +54,7 @@ void PortalFilePicker::saveDocument(const QUrl &suggestedUrl) {
     options.insert(QStringLiteral("current_folder"), portalPathBytes(folder));
     options.insert(QStringLiteral("current_name"), name);
 
-    requestFile(QStringLiteral("SaveFile"), QStringLiteral("Save Markdown file"),
+    requestFile(QStringLiteral("SaveFile"), QStringLiteral("Save File"),
                 options, Action::Save);
 }
 
