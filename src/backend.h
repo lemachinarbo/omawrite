@@ -63,7 +63,7 @@ private:
     void setWordCount(int words);
     void refreshWordCount();
     void scheduleWordCount();
-    void applyDocumentTypography();
+    void applyDocumentTypography(bool preserveUndo = false);
 
     FilePicker *m_filePicker = nullptr;
     QString m_documentText;
@@ -73,6 +73,8 @@ private:
     int m_wordCount = 0;
     bool m_darkMode = true;
     bool m_loading = false;
+    bool m_formattingTypography = false;
+    int m_formattedBlockCount = 0;
     QTimer m_wordCountTimer;
     QPointer<QTextDocument> m_document;
     QPointer<MarkdownHighlighter> m_highlighter;

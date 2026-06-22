@@ -19,18 +19,17 @@ void MarkdownHighlighter::setDarkMode(bool darkMode) {
 }
 
 void MarkdownHighlighter::rebuildFormats() {
-    const QColor marker = m_darkMode ? QColor(QStringLiteral("#54565c"))
-                                     : QColor(QStringLiteral("#aaa49d"));
+    const QColor marker = m_darkMode ? QColor(QStringLiteral("#4f525a"))
+                                     : QColor(QStringLiteral("#aeb1b5"));
     const QColor background = m_darkMode ? QColor(QStringLiteral("#101010"))
-                                         : QColor(QStringLiteral("#fbfaf5"));
-    const QColor text = m_darkMode ? QColor(QStringLiteral("#d2d2d0"))
-                                   : QColor(QStringLiteral("#1e1f21"));
-    const QColor link = m_darkMode ? QColor(QStringLiteral("#80a9d8"))
-                                   : QColor(QStringLiteral("#315f9b"));
-    const QColor quote = m_darkMode ? QColor(QStringLiteral("#88a098"))
-                                    : QColor(QStringLiteral("#5f766f"));
-    const QColor codeBackground = m_darkMode ? QColor(QStringLiteral("#1d1d1d"))
-                                             : QColor(QStringLiteral("#ece8df"));
+                                         : QColor(QStringLiteral("#ffffff"));
+    const QColor text = m_darkMode ? QColor(QStringLiteral("#eeeeee"))
+                                   : QColor(QStringLiteral("#222324"));
+    const QColor link = m_darkMode ? QColor(QStringLiteral("#5584aa"))
+                                   : QColor(QStringLiteral("#2077b2"));
+    const QColor quote = marker;
+    const QColor codeBackground = m_darkMode ? QColor(QStringLiteral("#1c1a1a"))
+                                             : QColor(QStringLiteral("#f8f8f8"));
 
     m_markerFormat = QTextCharFormat();
     m_markerFormat.setForeground(marker);

@@ -13,11 +13,11 @@ ApplicationWindow {
     title: (backend.modified ? "* " : "") + backend.fileName + " - Omawrite"
 
     readonly property bool darkMode: backend.darkMode
-    readonly property color pageColor: darkMode ? "#101010" : "#fbfaf5"
-    readonly property color textColor: darkMode ? "#bbbcbc" : "#333331"
-    readonly property color strongTextColor: darkMode ? "#d0d0cc" : "#161616"
-    readonly property color mutedColor: darkMode ? "#676862" : "#aaa49d"
-    readonly property color selectionFill: darkMode ? "#4a4a46" : "#c7d7ee"
+    readonly property color pageColor: darkMode ? "#101010" : "#ffffff"
+    readonly property color textColor: darkMode ? "#d0d0d0" : "#42464c"
+    readonly property color strongTextColor: darkMode ? "#eeeeee" : "#222324"
+    readonly property color mutedColor: darkMode ? "#909191" : "#aeb1b5"
+    readonly property color selectionFill: darkMode ? "#186a9a" : "#2077b2"
     readonly property int editorFontPixelSize: 20
     readonly property int editorWidth: Math.min(
         Math.round(writerFontMetrics.averageCharacterWidth * 65),
@@ -25,7 +25,7 @@ ApplicationWindow {
     property bool previewMode: false
 
     Material.theme: darkMode ? Material.Dark : Material.Light
-    Material.accent: darkMode ? "#d9d4c8" : "#202124"
+    Material.accent: darkMode ? "#5584aa" : "#2077b2"
     color: pageColor
 
     FontMetrics {

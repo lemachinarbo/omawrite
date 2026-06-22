@@ -20,7 +20,7 @@
 #include "markdownhighlighter.h"
 
 namespace {
-constexpr qreal typoraLineHeightPercent = 180;
+constexpr qreal typoraLineHeightPercent = 140;
 
 QString normalizedLinkUrl(const QString &clipboardText) {
     QString candidate = clipboardText.trimmed();
@@ -208,8 +208,11 @@ QString Backend::clipboardUrl() const {
 }
 
 void Backend::editorTextChanged() {
-    if (m_loading)
+    if (m_loading || m_formattingTypography)
         return;
+
+    if (m_document && m_document->blockCount() != m_formattedBlockCount)
+        applyDocumentTypography(true);
 
     scheduleWordCount();
     setModified(true);
@@ -307,7 +310,7 @@ void Backend::scheduleWordCount() {
     m_wordCountTimer.start();
 }
 
-void Backend::applyDocumentTypography() {
+void Backend::applyDocumentTypography(bool preserveUndo) {
     if (!m_document)
         return;
 
@@ -315,11 +318,19 @@ void Backend::applyDocumentTypography() {
     blockFormat.setLineHeight(typoraLineHeightPercent, QTextBlockFormat::ProportionalHeight);
 
     const bool undoEnabled = m_document->isUndoRedoEnabled();
-    m_document->setUndoRedoEnabled(false);
+    if (!preserveUndo)
+        m_document->setUndoRedoEnabled(false);
 
+    m_formattingTypography = true;
     QTextCursor cursor(m_document);
+    cursor.movePosition(QTextCursor::Start);
+    cursor.mergeBlockFormat(blockFormat);
     cursor.select(QTextCursor::Document);
     cursor.mergeBlockFormat(blockFormat);
+    m_formattingTypography = false;
 
-    m_document->setUndoRedoEnabled(undoEnabled);
+    if (!preserveUndo)
+        m_document->setUndoRedoEnabled(undoEnabled);
+
+    m_formattedBlockCount = m_document->blockCount();
 }
