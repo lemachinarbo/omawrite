@@ -10,6 +10,7 @@
 #include <QProcess>
 #include <QQuickTextDocument>
 #include <QRegularExpression>
+#include <QTextDocument>
 #include <QTextStream>
 #include <QUrl>
 
@@ -19,7 +20,11 @@
 namespace {
 QString normalizedLinkUrl(const QString &clipboardText) {
     QString candidate = clipboardText.trimmed();
-    const int lineBreak = candidate.indexOf(QRegularExpression(QStringLiteral("[\\r\\n]")));
+    const int newline = candidate.indexOf(QLatin1Char('\n'));
+    const int carriageReturn = candidate.indexOf(QLatin1Char('\r'));
+    int lineBreak = newline;
+    if (lineBreak < 0 || (carriageReturn >= 0 && carriageReturn < lineBreak))
+        lineBreak = carriageReturn;
     if (lineBreak >= 0)
         candidate = candidate.left(lineBreak).trimmed();
 
@@ -54,6 +59,10 @@ QString normalizedLinkUrl(const QString &clipboardText) {
 
 Backend::Backend(FilePicker *filePicker, QObject *parent)
     : QObject(parent), m_filePicker(filePicker) {
+    m_wordCountTimer.setSingleShot(true);
+    m_wordCountTimer.setInterval(120);
+    connect(&m_wordCountTimer, &QTimer::timeout, this, &Backend::refreshWordCount);
+
     if (!m_filePicker)
         return;
 
@@ -63,17 +72,19 @@ Backend::Backend(FilePicker *filePicker, QObject *parent)
 }
 
 void Backend::setDocumentText(const QString &text) {
-    if (m_documentText == text)
+    if (m_documentText == text && (!m_document || m_document->toPlainText() == text))
         return;
 
     m_documentText = text;
     emit documentTextChanged();
 
-    const int words = countWords(m_documentText);
-    if (m_wordCount != words) {
-        m_wordCount = words;
-        emit wordCountChanged();
+    if (m_loading) {
+        if (m_wordCountTimer.isActive())
+            m_wordCountTimer.stop();
+        setWordCount(countWords(m_documentText));
     }
+    else
+        scheduleWordCount();
 
     if (!m_loading)
         setModified(true);
@@ -113,7 +124,8 @@ void Backend::attachDocument(QObject *textDocument) {
     if (m_highlighter)
         delete m_highlighter.data();
 
-    m_highlighter = new MarkdownHighlighter(quickDocument->textDocument());
+    m_document = quickDocument->textDocument();
+    m_highlighter = new MarkdownHighlighter(m_document);
     m_highlighter->setDarkMode(m_darkMode);
 }
 
@@ -189,6 +201,14 @@ QString Backend::clipboardUrl() const {
     return normalizedLinkUrl(mimeData->text());
 }
 
+void Backend::editorTextChanged() {
+    if (m_loading)
+        return;
+
+    scheduleWordCount();
+    setModified(true);
+}
+
 void Backend::setFileUrl(const QUrl &url) {
     if (m_fileUrl == url)
         return;
@@ -226,12 +246,14 @@ void Backend::saveTo(const QUrl &url) {
         return;
     }
 
-    file.write(m_documentText.toUtf8());
+    const QString text = currentDocumentText();
+    file.write(text.toUtf8());
     if (file.error() != QFileDevice::NoError) {
         setStatus(QStringLiteral("Could not write %1.").arg(targetName));
         return;
     }
 
+    m_documentText = text;
     setFileUrl(url);
     setModified(false);
     setStatus(QStringLiteral("Saved %1").arg(fileName()));
@@ -244,6 +266,10 @@ QUrl Backend::suggestedSaveUrl() const {
     return QUrl::fromLocalFile(QDir::home().filePath(QStringLiteral("Untitled.md")));
 }
 
+QString Backend::currentDocumentText() const {
+    return m_document ? m_document->toPlainText() : m_documentText;
+}
+
 int Backend::countWords(const QString &text) const {
     static const QRegularExpression wordRe(
         QStringLiteral("[\\p{L}\\p{N}]+(?:['-][\\p{L}\\p{N}]+)*"));
@@ -254,4 +280,23 @@ int Backend::countWords(const QString &text) const {
         ++count;
     }
     return count;
+}
+
+void Backend::setWordCount(int words) {
+    if (m_wordCount == words)
+        return;
+
+    m_wordCount = words;
+    emit wordCountChanged();
+}
+
+void Backend::refreshWordCount() {
+    if (m_wordCountTimer.isActive())
+        m_wordCountTimer.stop();
+
+    setWordCount(countWords(currentDocumentText()));
+}
+
+void Backend::scheduleWordCount() {
+    m_wordCountTimer.start();
 }

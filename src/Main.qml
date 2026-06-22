@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
-import QtQuick.Layouts
 import QtQuick.Window
 
 ApplicationWindow {
@@ -15,7 +14,7 @@ ApplicationWindow {
 
     readonly property bool darkMode: backend.darkMode
     readonly property color pageColor: darkMode ? "#101010" : "#fbfaf5"
-    readonly property color textColor: darkMode ? "#b7b7b3" : "#333331"
+    readonly property color textColor: darkMode ? "#bbbcbc" : "#333331"
     readonly property color strongTextColor: darkMode ? "#d0d0cc" : "#161616"
     readonly property color mutedColor: darkMode ? "#676862" : "#aaa49d"
     readonly property color selectionFill: darkMode ? "#4a4a46" : "#c7d7ee"
@@ -148,6 +147,9 @@ ApplicationWindow {
                     width: 1
                     color: win.strongTextColor
                 }
+                property int cachedHiddenLineStart: -1
+                property string cachedHiddenLineText: ""
+                property var cachedHiddenRanges: []
 
                 function replaceSelectionWith(replacement) {
                     var start = Math.min(selectionStart, selectionEnd);
@@ -210,6 +212,9 @@ ApplicationWindow {
 
                 function hiddenRangesForLine(lineText, lineStart) {
                     var ranges = [];
+                    if (lineText.search(/[*_\[]/) === -1)
+                        return ranges;
+
                     var match;
                     var re = /(\*\*|__)(.+?)(\1)/g;
                     while ((match = re.exec(lineText)) !== null) {
@@ -253,7 +258,16 @@ ApplicationWindow {
 
                 function hiddenRangesAt(position) {
                     var bounds = lineBounds(position);
-                    return hiddenRangesForLine(text.slice(bounds.start, bounds.end), bounds.start);
+                    var lineText = text.slice(bounds.start, bounds.end);
+                    if (bounds.start === cachedHiddenLineStart
+                            && lineText === cachedHiddenLineText) {
+                        return cachedHiddenRanges;
+                    }
+
+                    cachedHiddenLineStart = bounds.start;
+                    cachedHiddenLineText = lineText;
+                    cachedHiddenRanges = hiddenRangesForLine(lineText, bounds.start);
+                    return cachedHiddenRanges;
                 }
 
                 function skipHiddenForward(position) {
@@ -340,8 +354,11 @@ ApplicationWindow {
                 }
 
                 onTextChanged: {
-                    if (backend.documentText !== text)
-                        backend.documentText = text;
+                    cachedHiddenLineStart = -1;
+                    cachedHiddenLineText = "";
+                    cachedHiddenRanges = [];
+
+                    backend.editorTextChanged();
                 }
 
                 Text {
@@ -369,7 +386,7 @@ ApplicationWindow {
                 width: win.editorWidth
                 visible: previewMode
                 readOnly: true
-                text: backend.documentText
+                text: win.previewMode ? editor.text : ""
                 textFormat: TextEdit.MarkdownText
                 wrapMode: TextEdit.Wrap
                 selectByMouse: true

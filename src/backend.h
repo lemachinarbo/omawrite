@@ -3,10 +3,12 @@
 #include <QObject>
 #include <QPointer>
 #include <QString>
+#include <QTimer>
 #include <QUrl>
 
 class FilePicker;
 class MarkdownHighlighter;
+class QTextDocument;
 
 class Backend : public QObject {
     Q_OBJECT
@@ -40,6 +42,7 @@ public:
     Q_INVOKABLE void saveAsDialog();
     Q_INVOKABLE void newWindow();
     Q_INVOKABLE QString clipboardUrl() const;
+    Q_INVOKABLE void editorTextChanged();
 
 signals:
     void documentTextChanged();
@@ -55,7 +58,11 @@ private:
     void setStatus(const QString &status);
     void saveTo(const QUrl &url);
     QUrl suggestedSaveUrl() const;
+    QString currentDocumentText() const;
     int countWords(const QString &text) const;
+    void setWordCount(int words);
+    void refreshWordCount();
+    void scheduleWordCount();
 
     FilePicker *m_filePicker = nullptr;
     QString m_documentText;
@@ -65,5 +72,7 @@ private:
     int m_wordCount = 0;
     bool m_darkMode = true;
     bool m_loading = false;
+    QTimer m_wordCountTimer;
+    QPointer<QTextDocument> m_document;
     QPointer<MarkdownHighlighter> m_highlighter;
 };
