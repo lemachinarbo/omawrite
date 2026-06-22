@@ -97,13 +97,15 @@ bool SystemTheme::detectDarkMode() const {
     if (known)
         return portalDark;
 
-    const bool gsettingsDark = gsettingsDarkMode(&known);
-    if (known)
-        return gsettingsDark;
-
+    // Prefer the non-blocking Qt color-scheme hint before falling back to the
+    // gsettings subprocess, which blocks this (UI) thread while it runs.
     const bool qtDark = qtDarkMode(&known);
     if (known)
         return qtDark;
+
+    const bool gsettingsDark = gsettingsDarkMode(&known);
+    if (known)
+        return gsettingsDark;
 
     return true;
 }
@@ -137,8 +139,11 @@ bool SystemTheme::gsettingsDarkMode(bool *known) const {
         QStringLiteral("color-scheme")
     });
 
-    if (!gsettings.waitForFinished(250))
+    if (!gsettings.waitForFinished(150)) {
+        gsettings.kill();
+        gsettings.waitForFinished(50);
         return false;
+    }
 
     const QString output = QString::fromUtf8(gsettings.readAllStandardOutput()).trimmed();
     if (output.contains(QStringLiteral("prefer-dark"))) {

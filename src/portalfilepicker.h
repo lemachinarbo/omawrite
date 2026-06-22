@@ -24,7 +24,7 @@ private:
     };
 
     bool requestFile(const QString &method, const QString &title,
-                     const QVariantMap &options, Action action);
+                     QVariantMap options, Action action);
     void clearPending();
 
     QString m_pendingPath;

@@ -14,6 +14,18 @@ QString portalToken() {
     return QStringLiteral("omawrite_%1").arg(QRandomGenerator::global()->generate());
 }
 
+// The portal creates the Request object at a path derived from our unique bus
+// name and the handle_token we pass, so we can predict it and subscribe before
+// the call returns. This avoids missing a Response emitted before we connect.
+QString expectedRequestPath(const QString &token) {
+    QString sender = QDBusConnection::sessionBus().baseService();
+    if (sender.startsWith(QLatin1Char(':')))
+        sender.remove(0, 1);
+    sender.replace(QLatin1Char('.'), QLatin1Char('_'));
+    return QStringLiteral("/org/freedesktop/portal/desktop/request/%1/%2")
+        .arg(sender, token);
+}
+
 QByteArray portalPathBytes(const QString &path) {
     QByteArray bytes = path.toUtf8();
     bytes.append('\0');
@@ -25,7 +37,6 @@ PortalFilePicker::PortalFilePicker(QObject *parent) : FilePicker(parent) {}
 
 void PortalFilePicker::openDocument() {
     QVariantMap options;
-    options.insert(QStringLiteral("handle_token"), portalToken());
     options.insert(QStringLiteral("accept_label"), QStringLiteral("Open"));
     options.insert(QStringLiteral("modal"), true);
     options.insert(QStringLiteral("multiple"), false);
@@ -48,7 +59,6 @@ void PortalFilePicker::saveDocument(const QUrl &suggestedUrl) {
         : target.fileName();
 
     QVariantMap options;
-    options.insert(QStringLiteral("handle_token"), portalToken());
     options.insert(QStringLiteral("accept_label"), QStringLiteral("Save"));
     options.insert(QStringLiteral("modal"), true);
     options.insert(QStringLiteral("current_folder"), portalPathBytes(folder));
@@ -59,7 +69,7 @@ void PortalFilePicker::saveDocument(const QUrl &suggestedUrl) {
 }
 
 bool PortalFilePicker::requestFile(const QString &method, const QString &title,
-                                   const QVariantMap &options, Action action) {
+                                   QVariantMap options, Action action) {
     if (m_pendingAction != Action::None) {
         emit failed(QStringLiteral("A file picker is already open."));
         return false;
@@ -74,7 +84,23 @@ bool PortalFilePicker::requestFile(const QString &method, const QString &title,
         return false;
     }
 
+    const QString token = portalToken();
+    options.insert(QStringLiteral("handle_token"), token);
+
+    // Subscribe to the predicted Response path *before* issuing the call so a
+    // fast backend cannot emit Response before we are listening.
+    m_pendingPath = expectedRequestPath(token);
     m_pendingAction = action;
+    const bool connected = QDBusConnection::sessionBus().connect(
+        QStringLiteral("org.freedesktop.portal.Desktop"), m_pendingPath,
+        QStringLiteral("org.freedesktop.portal.Request"), QStringLiteral("Response"),
+        this, SLOT(handleResponse(uint,QVariantMap)));
+    if (!connected) {
+        clearPending();
+        emit failed(QStringLiteral("Could not listen for the portal file picker response."));
+        return false;
+    }
+
     auto *watcher = new QDBusPendingCallWatcher(
         portal.asyncCall(method, QString(), title, options), this);
 
@@ -89,14 +115,23 @@ bool PortalFilePicker::requestFile(const QString &method, const QString &title,
             return;
         }
 
-        m_pendingPath = reply.value().path();
-        const bool connected = QDBusConnection::sessionBus().connect(
-            QStringLiteral("org.freedesktop.portal.Desktop"), m_pendingPath,
-            QStringLiteral("org.freedesktop.portal.Request"), QStringLiteral("Response"),
-            this, SLOT(handleResponse(uint,QVariantMap)));
-        if (!connected) {
-            clearPending();
-            emit failed(QStringLiteral("Could not listen for the portal file picker response."));
+        // Older portals may hand back a different path than the predicted one;
+        // re-subscribe to the authoritative path if so.
+        const QString actualPath = reply.value().path();
+        if (actualPath != m_pendingPath) {
+            QDBusConnection::sessionBus().disconnect(
+                QStringLiteral("org.freedesktop.portal.Desktop"), m_pendingPath,
+                QStringLiteral("org.freedesktop.portal.Request"), QStringLiteral("Response"),
+                this, SLOT(handleResponse(uint,QVariantMap)));
+            m_pendingPath = actualPath;
+            const bool connected = QDBusConnection::sessionBus().connect(
+                QStringLiteral("org.freedesktop.portal.Desktop"), m_pendingPath,
+                QStringLiteral("org.freedesktop.portal.Request"), QStringLiteral("Response"),
+                this, SLOT(handleResponse(uint,QVariantMap)));
+            if (!connected) {
+                clearPending();
+                emit failed(QStringLiteral("Could not listen for the portal file picker response."));
+            }
         }
     });
 

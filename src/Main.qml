@@ -157,7 +157,9 @@ ApplicationWindow {
             anchors.bottomMargin: 0
             clip: true
             contentWidth: width
-            contentHeight: Math.max(height, editor.y + editor.implicitHeight + 220)
+            contentHeight: Math.max(height, (previewMode
+                ? preview.y + preview.implicitHeight
+                : editor.y + editor.implicitHeight) + 220)
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar {
                 policy: ScrollBar.AsNeeded

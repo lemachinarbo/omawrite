@@ -10,6 +10,7 @@
 #include <QProcess>
 #include <QQuickTextDocument>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QTextBlockFormat>
 #include <QTextCursor>
 #include <QTextDocument>
@@ -138,6 +139,15 @@ void Backend::attachDocument(QObject *textDocument) {
     m_document = quickDocument->textDocument();
     m_highlighter = new MarkdownHighlighter(m_document);
     m_highlighter->setDarkMode(m_darkMode);
+
+    connect(m_document, &QTextDocument::contentsChange, this,
+            [this](int position, int, int charsAdded) {
+                if (m_formattingTypography || m_loading)
+                    return;
+                m_lastChangePos = position;
+                m_lastChangeAdded = charsAdded;
+            });
+
     applyDocumentTypography();
 }
 
@@ -232,8 +242,12 @@ void Backend::editorTextChanged() {
     if (m_loading || m_formattingTypography)
         return;
 
-    if (m_document && m_document->blockCount() != m_formattedBlockCount)
-        applyDocumentTypography(true);
+    if (m_document) {
+        const int blockCount = m_document->blockCount();
+        if (blockCount > m_formattedBlockCount)
+            reapplyTypographyToChange();
+        m_formattedBlockCount = blockCount;
+    }
 
     scheduleWordCount();
     setModified(true);
@@ -271,8 +285,8 @@ void Backend::saveTo(const QUrl &url) {
     }
 
     const QString targetName = QFileInfo(url.toLocalFile()).fileName();
-    QFile file(url.toLocalFile());
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+    QSaveFile file(url.toLocalFile());
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         m_closeAfterSave = false;
         setStatus(QStringLiteral("Could not save %1.").arg(targetName));
         return;
@@ -280,7 +294,10 @@ void Backend::saveTo(const QUrl &url) {
 
     const QString text = currentDocumentText();
     file.write(text.toUtf8());
-    if (file.error() != QFileDevice::NoError) {
+
+    // commit() flushes, fsyncs, and atomically renames the temp file into place,
+    // returning false (and leaving the original untouched) on any write error.
+    if (!file.commit()) {
         m_closeAfterSave = false;
         setStatus(QStringLiteral("Could not write %1.").arg(targetName));
         return;
@@ -339,27 +356,49 @@ void Backend::scheduleWordCount() {
     m_wordCountTimer.start();
 }
 
-void Backend::applyDocumentTypography(bool preserveUndo) {
+void Backend::applyDocumentTypography() {
     if (!m_document)
         return;
 
     QTextBlockFormat blockFormat;
     blockFormat.setLineHeight(typoraLineHeightPercent, QTextBlockFormat::ProportionalHeight);
 
+    // A full pass is only used for freshly loaded/attached documents, so it is
+    // safe to drop undo history here (re-enabling clears the stack anyway).
     const bool undoEnabled = m_document->isUndoRedoEnabled();
-    if (!preserveUndo)
-        m_document->setUndoRedoEnabled(false);
+    m_document->setUndoRedoEnabled(false);
 
     m_formattingTypography = true;
     QTextCursor cursor(m_document);
-    cursor.movePosition(QTextCursor::Start);
-    cursor.mergeBlockFormat(blockFormat);
     cursor.select(QTextCursor::Document);
     cursor.mergeBlockFormat(blockFormat);
     m_formattingTypography = false;
 
-    if (!preserveUndo)
-        m_document->setUndoRedoEnabled(undoEnabled);
+    m_document->setUndoRedoEnabled(undoEnabled);
 
     m_formattedBlockCount = m_document->blockCount();
+}
+
+void Backend::reapplyTypographyToChange() {
+    if (!m_document)
+        return;
+
+    QTextBlockFormat blockFormat;
+    blockFormat.setLineHeight(typoraLineHeightPercent, QTextBlockFormat::ProportionalHeight);
+
+    // Format only the block(s) touched by the last edit instead of the whole
+    // document, and fold the change into the preceding edit command so a single
+    // undo reverts both the text and its formatting.
+    const int maxPos = m_document->characterCount() - 1;
+    const int start = qBound(0, m_lastChangePos, maxPos);
+    const int end = qBound(start, m_lastChangePos + m_lastChangeAdded, maxPos);
+
+    m_formattingTypography = true;
+    QTextCursor cursor(m_document);
+    cursor.joinPreviousEditBlock();
+    cursor.setPosition(start);
+    cursor.setPosition(end, QTextCursor::KeepAnchor);
+    cursor.mergeBlockFormat(blockFormat);
+    cursor.endEditBlock();
+    m_formattingTypography = false;
 }
