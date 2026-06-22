@@ -369,6 +369,18 @@ ApplicationWindow {
                         : skipHiddenBackward(pos);
                 }
 
+                function movePage(direction, extendSelection) {
+                    var pageStep = Math.max(win.editorFontPixelSize,
+                                            editorFlick.height - win.editorFontPixelSize * 2);
+                    var rect = cursorRectangle;
+                    var targetY = rect.y + rect.height / 2 + direction * pageStep;
+                    var target = positionAt(rect.x, Math.max(0, targetY));
+                    if (extendSelection)
+                        moveCursorSelection(target, TextEdit.SelectCharacters);
+                    else
+                        cursorPosition = target;
+                }
+
                 function deleteParagraphBreakBehindCursor() {
                     if (selectionStart !== selectionEnd || cursorPosition < 2)
                         return false;
@@ -410,6 +422,11 @@ ApplicationWindow {
                     } else if (!commandModifier && !(event.modifiers & Qt.ShiftModifier)
                                && event.key === Qt.Key_Left) {
                         moveCursorVisibly(-1);
+                        event.accepted = true;
+                    } else if (!commandModifier
+                               && (event.key === Qt.Key_PageDown || event.key === Qt.Key_PageUp)) {
+                        movePage(event.key === Qt.Key_PageDown ? 1 : -1,
+                                 event.modifiers & Qt.ShiftModifier);
                         event.accepted = true;
                     }
                 }
