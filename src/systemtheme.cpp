@@ -118,6 +118,8 @@ bool SystemTheme::portalDarkMode(bool *known) const {
     if (!settings.isValid())
         return false;
 
+    settings.setTimeout(150); // Prevent GUI thread freeze if portal service hangs
+
     QDBusReply<QDBusVariant> reply = settings.call(
         QStringLiteral("Read"),
         QStringLiteral("org.freedesktop.appearance"),
