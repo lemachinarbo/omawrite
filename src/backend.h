@@ -46,6 +46,7 @@ public:
     void setDarkMode(bool darkMode);
 
     Q_INVOKABLE void attachDocument(QObject *textDocument);
+    Q_INVOKABLE void attachPreviewDocument(QObject *textDocument);
     Q_INVOKABLE void openDialog();
     Q_INVOKABLE void open(const QUrl &url);
     Q_INVOKABLE void save();
@@ -79,6 +80,7 @@ private:
     void scheduleWordCount();
     void applyDocumentTypography();
     void reapplyTypographyToChange();
+    void updatePreviewStyleSheet();
 
     FilePicker *m_filePicker = nullptr;
     QString m_documentText;
@@ -95,6 +97,7 @@ private:
     int m_lastChangeAdded = 0;
     QTimer m_wordCountTimer;
     QPointer<QTextDocument> m_document;
+    QPointer<QTextDocument> m_previewDocument;
     QPointer<MarkdownHighlighter> m_highlighter;
 
     QString m_themeBackground;

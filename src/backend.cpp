@@ -12,11 +12,13 @@
 #include <QQuickTextDocument>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QPalette>
 #include <QTextBlockFormat>
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTextStream>
 #include <QUrl>
+#include <QDebug>
 
 #include "filepicker.h"
 #include "markdownhighlighter.h"
@@ -184,6 +186,29 @@ void Backend::attachDocument(QObject *textDocument) {
             });
 
     applyDocumentTypography();
+}
+
+void Backend::attachPreviewDocument(QObject *textDocument) {
+    auto *quickDocument = qobject_cast<QQuickTextDocument *>(textDocument);
+    if (!quickDocument || !quickDocument->textDocument())
+        return;
+
+    m_previewDocument = quickDocument->textDocument();
+    updatePreviewStyleSheet();
+}
+
+void Backend::updatePreviewStyleSheet() {
+    if (!m_previewDocument)
+        return;
+
+    QString styleSheet = QStringLiteral(
+        "a { color: %1; text-decoration: underline; }"
+        "table { border-collapse: collapse; width: 100%; margin-top: 10px; margin-bottom: 10px; }"
+        "th, td { border: 1px solid %2; padding: 6px; text-align: left; }"
+        "th { font-weight: bold; background-color: %3; }"
+    ).arg(m_themeAccent, m_themeForeground, m_themeBackground);
+
+    m_previewDocument->setDefaultStyleSheet(styleSheet);
 }
 
 void Backend::openDialog() {
@@ -491,6 +516,11 @@ void Backend::loadOmarchyTheme() {
         }
     }
 
+    QPalette appPalette = QGuiApplication::palette();
+    appPalette.setColor(QPalette::Link, QColor(m_themeAccent));
+    QGuiApplication::setPalette(appPalette);
+
+    updatePreviewStyleSheet();
     emit themeColorsChanged();
 }
 

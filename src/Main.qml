@@ -476,6 +476,15 @@ ApplicationWindow {
                 font.pixelSize: win.editorFontPixelSize
                 font.weight: Font.Normal
                 renderType: TextEdit.NativeRendering
+                palette.link: backend.themeAccent
+                palette.text: win.textColor
+                palette.windowText: win.textColor
+                palette.window: backend.themeBackground
+                palette.base: backend.themeBackground
+
+                Component.onCompleted: {
+                    backend.attachPreviewDocument(textDocument);
+                }
             }
         }
 
